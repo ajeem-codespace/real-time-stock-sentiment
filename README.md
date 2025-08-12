@@ -7,8 +7,6 @@ This project has a complete, end to end data engineering pipeline and performs r
 
 The final product is a dashboard built with Streamlit. It provides an at-a-glance snapshot of market sentiment, including trends, volume spikes, and short-term forecasts.
 
-![Dashboard](screenshots/dashboard_full.png)
-
 ### Key Features:
 - **Live Sentiment KPIs** 
 - **Comment Volume Spike Alerts** 
@@ -24,7 +22,8 @@ The final product is a dashboard built with Streamlit. It provides an at-a-glanc
 ## System Architecture
 
 
-![Architecture Diagram](screenshots/architecture_diagram.png)
+<img src="screenshots/architecture_diagram.png" alt="Architecture Diagram" width="400"/>
+
 
 1.  **Data Producers:** Two separate Python scripts run continuously:
     * **Sentiment Producer:** Streams new comments from the Reddit API.
@@ -100,7 +99,7 @@ The final product is a dashboard built with Streamlit. It provides an at-a-glanc
 
 
 
-### Note:  Running the Batch MVP (Initial Version)**
+### Note:  Running the Batch MVP (Initial Version)
 These scripts were part of the initial proof-of-concept.
 
 1.  **Collect a Sample Dataset:** `python collect_data_batch.py` (This creates `reddit_comments.csv`)
