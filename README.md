@@ -3,7 +3,18 @@
 This project is a complete, end-to-end data engineering pipeline that fetches real-time stock news, classifies headlines as **Positive** or **Negative** using a **PySpark ML pipeline**, and visualizes the results on an interactive dashboard.
 
 ---
+## Versions
 
+- **Finnhub pipeline → available on `main` branch
+- **Reddit pipeline with price correlation** → available as a [tag](https://github.com/ajeem-codespace/real-time-stock-sentiment/releases/tag/v1.0.0/Reddit-VADER) and also as a [separate repo](https://github.com/ajeem-codespace/rt-stock-reddit-sentiment-corr)
+
+To use the Reddit version:
+
+```bash
+git checkout reddit-v1.0.0
+```
+
+---
 ## 📊 Dashboard & Features
 
 The final product is a live dashboard built with Streamlit. It provides an at-a-glance snapshot of market sentiment for specific stocks, powered by a machine learning model.
