@@ -5,7 +5,7 @@ This project is a complete, end-to-end data engineering pipeline that fetches re
 ---
 ## Versions
 
-- **Finnhub pipeline → available on `main` branch
+- **Finnhub pipeline** → available on `main` branch
 - **Reddit pipeline with price correlation** → available as a [tag](https://github.com/ajeem-codespace/real-time-stock-sentiment/releases/tag/v1.0.0/Reddit-VADER) and also as a [separate repo](https://github.com/ajeem-codespace/rt-stock-reddit-sentiment-corr)
 
 To use the Reddit version:
