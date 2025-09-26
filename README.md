@@ -26,7 +26,7 @@ The final product is a live dashboard built with Streamlit. It provides an at-a-
 
 The project is built on a modern, real-time data streaming architecture where an offline-trained ML model is used for live inference.
 
-<img src="screenshots/architecture_diagram.png" alt="Architecture Diagram" width="600"/>
+<img src="screenshots/architecture_diagram.png" alt="Architecture Diagram" style="width:100%;"/>
 
 1.  **Model Training (Offline):** A PySpark ML `Pipeline` is trained on a labeled dataset of financial news headlines (`all-data.csv`). The trained model, which includes feature extraction and a Logistic Regression classifier, is saved to disk.
 2.  **Data Producer:** A Python script fetches the latest stock news from the **Finnhub API** and sends the articles as JSON messages to an **Apache Kafka** topic.
