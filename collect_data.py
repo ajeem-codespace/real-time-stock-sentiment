@@ -1,94 +1,104 @@
-import praw
+import os
 import time
 import json
-from kafka import KafkaProducer
+import socket
+from datetime import datetime, timedelta, timezone
+
 from dotenv import load_dotenv
+from kafka import KafkaProducer
+from kafka.errors import NoBrokersAvailable
+import finnhub
 
+# --- Configuration ---
 load_dotenv()
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
+if not FINNHUB_API_KEY:
+    raise RuntimeError("FINNHUB_API_KEY is not set in your environment (.env).")
 
-CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
-CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
-USER_AGENT = os.getenv("REDDIT_USER_AGENT")
+KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "stock_news")
+KAFKA_SERVER = os.getenv("KAFKA_SERVER", "localhost:9092")
+STOCKS_TO_TRACK = os.getenv("STOCKS_TO_TRACK", "AAPL,GOOGL,TSLA,MSFT,AMZN").split(",")
 
-
-KAFKA_TOPIC = 'reddit_comments'
-KAFKA_SERVER = 'localhost:9092' 
-
-
-STOCKS_TO_TRACK = {
-    'AAPL': ['apple', 'aapl', '$aapl'],
-    'GOOGL': ['google', 'googl', '$googl', 'alphabet'],
-    'TSLA': ['tesla', 'tsla', '$tsla'],
-    'MSFT': ['microsoft', 'msft', '$msft'],
-    'AMZN': ['amazon', 'amzn', '$amzn']
-}
-
-SUBREDDITS_TO_STREAM = [
-    'wallstreetbets', 'stocks', 'investing',
-    'StockMarket', 'options', 'RobinHood', 'pennystocks'
-] 
-
-def find_all_mentioned_stocks(text):
-    mentioned_stocks = set()
-    text_lower = text.lower()
-    for symbol, keywords in STOCKS_TO_TRACK.items():
-        for keyword in keywords:
-            if keyword in text_lower:
-                mentioned_stocks.add(symbol)
-    return mentioned_stocks
+POLL_SLEEP_BETWEEN_STOCKS_SEC = 2
+SLEEP_BETWEEN_CYCLES_SEC = 300  # 5 minutes
 
 def create_kafka_producer():
-    print("Connecting to Kafka")
-    retries = 5
-    for i in range(retries):
-        try:
-            producer = KafkaProducer(
-                bootstrap_servers=KAFKA_SERVER,
-                value_serializer=lambda v: json.dumps(v).encode('utf-8')
-            )
-            print("Successfully connected to Kafka.")
-            return producer
-        except Exception as e:
-            print(f"Attempt {i+1}/{retries}: Error connecting to Kafka: {e}")
-            if i < retries - 1:
-                print("Retrying")
-                time.sleep(5)
-    
-    print("Could not connect to Kafka.")
-    return None
-
-def stream_reddit_comments(producer):
-    print("Connecting to Reddit to stream comments")
+    """Creates and returns a Kafka producer (JSON serializer)."""
+    print(f"Connecting to Kafka at {KAFKA_SERVER}…")
     try:
-        reddit = praw.Reddit(
-            client_id=CLIENT_ID,
-            client_secret=CLIENT_SECRET,
-            user_agent=USER_AGENT,
-            check_for_async=False
+        producer = KafkaProducer(
+            bootstrap_servers=KAFKA_SERVER,
+            client_id=f"news-producer-{socket.gethostname()}",
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            linger_ms=100,
+            acks="all",
+            retries=5,
         )
-        
-        subreddit_string = "+".join(SUBREDDITS_TO_STREAM)
-        subreddit = reddit.subreddit(subreddit_string)
-        print(f"Successfully connected to Reddit, streaming from r/{subreddit_string}.")
-        
-        for comment in subreddit.stream.comments(skip_existing=True):
-            mentioned_stocks = find_all_mentioned_stocks(comment.body)
-            if mentioned_stocks and comment.body and comment.body != '[deleted]' and comment.body != '[removed]':
-                for stock_symbol in mentioned_stocks:
-                    data_record = {
-                        'stock_symbol': stock_symbol,
-                        'timestamp_utc': comment.created_utc,
-                        'comment_body': comment.body
-                    }
-                    producer.send(KAFKA_TOPIC, data_record)
-                    print(f"Sent to Kafka -> {stock_symbol}: {comment.body[:50]}...")
-            
-            time.sleep(1)
+        print("Successfully connected to Kafka.")
+        return producer
+    except NoBrokersAvailable as e:
+        raise RuntimeError(f"Could not connect to Kafka at {KAFKA_SERVER}: {e}")
 
+def fetch_news_and_send_finnhub(producer: KafkaProducer, finnhub_client: finnhub.Client, stock_symbol: str):
+    print(f"Fetching news for {stock_symbol} from Finnhub…")
+    now_utc = datetime.now(timezone.utc)
+    yesterday_utc = now_utc - timedelta(hours=24)
+
+    try:
+        items = finnhub_client.company_news(
+            stock_symbol,
+            _from=yesterday_utc.strftime("%Y-%m-%d"),
+            to=now_utc.strftime("%Y-%m-%d"),
+        ) or []
     except Exception as e:
-        print(f"An error occurred during streaming: {e}")
+        print(f"[{stock_symbol}] Finnhub error: {e}")
+        return
 
-if __name__ == '__main__':
-    kafka_producer = create_kafka_producer()
-    if kafka_producer:
-        stream_reddit_comments(kafka_producer)
+    sent = 0
+    for article in items:
+        headline = article.get("headline")
+        ts_unix = article.get("datetime")  # seconds since epoch
+        source = article.get("source")
+        summary = article.get("summary")
+        url = article.get("url")
+
+        if not headline or not ts_unix:
+            continue
+
+        # Normalize to ISO-8601 UTC
+        published_at_iso = datetime.fromtimestamp(int(ts_unix), tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        record = {
+            "stock_symbol": stock_symbol,
+            "headline": headline,
+            "source": source,
+            "published_at": published_at_iso,
+            "summary": summary,
+            "url": url,
+        }
+
+        try:
+            producer.send(KAFKA_TOPIC, record)
+            sent += 1
+        except Exception as e:
+            print(f"[{stock_symbol}] Failed to send record to Kafka: {e}")
+
+    if sent:
+        producer.flush()
+        print(f"[{stock_symbol}] Sent {sent} article(s) to Kafka.")
+    else:
+        print(f"[{stock_symbol}] No new articles to send.")
+
+def main():
+    producer = create_kafka_producer()
+    finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
+
+    while True:
+        for sym in STOCKS_TO_TRACK:
+            fetch_news_and_send_finnhub(producer, finnhub_client, sym.strip().upper())
+            time.sleep(POLL_SLEEP_BETWEEN_STOCKS_SEC)
+        print("\n--- Completed a cycle. Waiting for 5 minutes. ---\n")
+        time.sleep(SLEEP_BETWEEN_CYCLES_SEC)
+
+if __name__ == "__main__":
+    main()

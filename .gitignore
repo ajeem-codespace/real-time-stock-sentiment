@@ -22,4 +22,6 @@ raw_loaded_data/
 processed_sentiment_data/
 spark-warehouse/
 
+# Spark Structured Streaming checkpoints
+_chkpt_*
 
