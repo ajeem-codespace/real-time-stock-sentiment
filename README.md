@@ -11,7 +11,7 @@ This project is a complete, end-to-end data engineering pipeline that fetches re
 To use the Reddit version:
 
 ```bash
-git checkout reddit-v1.0.0
+git checkout v1.0.0/Reddit-VADER
 ```
 
 ---
