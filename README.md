@@ -42,7 +42,7 @@ The entire backend pipeline runs in separate, coordinated processes.
 
 | Producer (Sending to Kafka) | Consumer (Spark Processing) |
 | :---: | :---: |
-| ![Kafka Producer](screenshots/producer.png) | ![Spark Consumer](screenshots/consumer.png) |
+| ![Kafka Producer](screenshots/Producer.png) | ![Spark Consumer](screenshots/consumer.png) |
 
 ---
 
