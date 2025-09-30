@@ -73,8 +73,8 @@ The entire backend pipeline runs in separate, coordinated processes.
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/your-username/your-repository-name.git](https://github.com/your-username/your-repository-name.git)
-    cd your-repository-name
+    git clone https://github.com/ajeem-codespace/real-time-stock-sentiment
+    cd real-time-stock-sentiment
     ```
 2.  **Set up the environment:**
     ```bash
